@@ -44,7 +44,7 @@ class DB:
             This method saves the user to the database without
             performing validations.
         """
-        new_user = User(email=email, hashed_password=hashed_password)
-        self._session.add(new_user)
+        user = User(email=email, hashed_password=hashed_password)
+        self._session.add(user)
         self._session.commit()
-        return new_user
+        return user
