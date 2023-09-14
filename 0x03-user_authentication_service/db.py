@@ -43,42 +43,61 @@ class DB:
             This method saves the user to the database without
             performing validations.
         """
-        user = User(email=email, hashed_password=hashed_password)
-        self._session.add(user)
-        self._session.commit()
+        new_user = User(email=email, hashed_password=hashed_password)
+        try:
+            self._session.add(new_user)
+            self._session.commit()
+        except Exception as e:
+            print(f"Error adding user to database: {e}")
+            self._session.rollback()
+            raise
+        return new_user
+
+    def find_user_by(self, **kwargs: Dict[str, str]) -> User:
+        """Find a user by specified attributes.
+
+        Raises:
+            error: NoResultFound: When no results are found.
+            error: InvalidRequestError: When invalid query arguments are passed
+
+        Returns:
+            User: First row found in the `users` table.
+        """
+        session = self._session
+        try:
+            user = session.query(User).filter_by(**kwargs).one()
+        except NoResultFound:
+            raise NoResultFound()
+        except InvalidRequestError:
+            raise InvalidRequestError()
         return user
 
-    def find_user_by(self, **kwargs) -> User:
-        """
-        This method takes in arbitrary keyword arguments
-        and returns the first row found in the users table
-        as filtered by the method’s input arguments.
-        """
-        if kwargs is None:
-            raise InvalidRequestError
-        for k in kwargs.keys():
-            if not hasattr(User, k):
-                raise InvalidRequestError
-        try:
-            user = self._session.query(User).filter_by(**kwargs).first()
-        except InvalidRequestError:
-            raise InvalidRequestError
-        if user is None:
-            raise NoResultFound
-        else:
-            return user
-
     def update_user(self, user_id: int, **kwargs) -> None:
+        """Updates a user's attributes by user ID and arbitrary keyword
+        arguments.
+
+        Args:
+            user_id (int): The ID of the user to update.
+            **kwargs: Keyword arguments representing the user's attributes to
+            update.
+
+        Raises:
+            ValueError: If an invalid attribute is passed in kwargs.
+
+        Returns:
+            None
         """
-        The method will use find_user_by to locate the user to update,
-        then will update the user’s attributes
-        as passed in the method’s arguments
-        then commit changes to the database.
-        """
-        user = self.find_user_by(id=user_id)
-        for k, v in kwargs.items():
-            if not hasattr(user, k):
-                raise ValueError
-            else:
-                setattr(user, k, v)
-        self._session.commit()
+        try:
+            user = self.find_user_by(id=user_id)
+        except NoResultFound:
+            raise ValueError("User with id {} not found".format(user_id))
+
+        for key, value in kwargs.items():
+            if not hasattr(user, key):
+                raise ValueError("User has no attribute {}".format(key))
+            setattr(user, key, value)
+
+        try:
+            self._session.commit()
+        except InvalidRequestError:
+            raise ValueError("Invalid request")
